@@ -4,7 +4,7 @@ import { createLanguageModel, extractJSON } from "@/lib/ai/ai-sdk";
 import type { ProviderConfig } from "@/lib/ai/ai-sdk";
 import { db } from "@/lib/db";
 import { projects, characters, shots, dialogues } from "@/lib/db/schema";
-import { eq, asc, and, lt, desc } from "drizzle-orm";
+import { eq, asc, and, lt, gt, desc } from "drizzle-orm";
 import { getUserIdFromRequest } from "@/lib/get-user-id";
 import { ulid } from "ulid";
 import { enqueueTask } from "@/lib/task-queue";
@@ -638,21 +638,33 @@ async function handleSingleFrameGenerate(
     .orderBy(desc(shots.sequence))
     .limit(1);
 
+  const [nextShot] = await db
+    .select()
+    .from(shots)
+    .where(and(eq(shots.projectId, projectId), gt(shots.sequence, shot.sequence)))
+    .orderBy(asc(shots.sequence))
+    .limit(1);
+
   const ai = resolveImageProvider(modelConfig);
 
   try {
     await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
 
-    const firstPrompt = buildFirstFramePrompt({
-      sceneDescription: shot.prompt || "",
-      startFrameDesc: shot.startFrameDesc || shot.prompt || "",
-      characterDescriptions,
-      previousLastFrame: previousShot?.lastFrame || undefined,
-    });
-    const firstFramePath = await ai.generateImage(firstPrompt, {
-      quality: "hd",
-      referenceImages: charRefImages,
-    });
+    // Reuse previous shot's lastFrame directly — no need to regenerate
+    let firstFramePath: string;
+    if (previousShot?.lastFrame) {
+      firstFramePath = previousShot.lastFrame;
+    } else {
+      const firstPrompt = buildFirstFramePrompt({
+        sceneDescription: shot.prompt || "",
+        startFrameDesc: shot.startFrameDesc || shot.prompt || "",
+        characterDescriptions,
+      });
+      firstFramePath = await ai.generateImage(firstPrompt, {
+        quality: "hd",
+        referenceImages: charRefImages,
+      });
+    }
 
     const lastPrompt = buildLastFramePrompt({
       sceneDescription: shot.prompt || "",
@@ -669,6 +681,14 @@ async function handleSingleFrameGenerate(
       .update(shots)
       .set({ firstFrame: firstFramePath, lastFrame: lastFramePath, status: "completed" })
       .where(eq(shots.id, shotId));
+
+    // Sync next shot's firstFrame to maintain continuity chain
+    if (nextShot) {
+      await db
+        .update(shots)
+        .set({ firstFrame: lastFramePath })
+        .where(eq(shots.id, nextShot.id));
+    }
 
     return NextResponse.json({ shotId, firstFrame: firstFramePath, lastFrame: lastFramePath, status: "ok" });
   } catch (err) {
