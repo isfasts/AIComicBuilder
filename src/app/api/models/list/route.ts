@@ -40,6 +40,28 @@ async function fetchModels(baseUrl: string, apiKey: string): Promise<ModelItem[]
   return data.data.map((m) => ({ id: m.id, name: m.id }));
 }
 
+async function fetchGeminiModels(baseUrl: string, apiKey: string): Promise<ModelItem[]> {
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/v1beta/models?key=${encodeURIComponent(apiKey)}`;
+  console.log("[models/list] Fetching Gemini:", url.replace(apiKey, "***"));
+
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${text.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as { models?: { name: string; displayName?: string }[] };
+  if (!data.models || !Array.isArray(data.models)) {
+    throw new Error("Unexpected Gemini response format: missing models array");
+  }
+  return data.models.map((m) => {
+    const id = m.name.replace(/^models\//, "");
+    return { id, name: m.displayName || id };
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ListRequest;
@@ -67,7 +89,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "API Key is required" }, { status: 400 });
     }
 
-    const models = await fetchModels(body.baseUrl, body.apiKey);
+    const models = body.protocol === "gemini"
+      ? await fetchGeminiModels(body.baseUrl, body.apiKey)
+      : await fetchModels(body.baseUrl, body.apiKey);
     return NextResponse.json({ models });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
