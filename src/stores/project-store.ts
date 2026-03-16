@@ -39,7 +39,7 @@ interface Project {
   script: string;
   status: string;
   finalVideoUrl: string | null;
-  generationMode: string;
+  generationMode: "keyframe" | "reference";
   characters: Character[];
   shots: Shot[];
 }
