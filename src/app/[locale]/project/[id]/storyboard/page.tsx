@@ -4,7 +4,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useModelStore } from "@/stores/model-store";
 import { ShotCard } from "@/components/editor/shot-card";
 import { Button } from "@/components/ui/button";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useState, useEffect } from "react";
 import {
   Select,
@@ -94,6 +94,7 @@ function WorkflowStep({
 
 export default function StoryboardPage() {
   const t = useTranslations();
+  const locale = useLocale();
   const { project, fetchProject } = useProjectStore();
   const getModelConfig = useModelStore((s) => s.getModelConfig);
   const [generating, setGenerating] = useState(false);
@@ -599,6 +600,17 @@ export default function StoryboardPage() {
                   : t("project.batchGenerateVideosOverwrite")}
               </Button>
             </>
+          )}
+
+          {/* Step 4: Go to Preview */}
+          {totalShots > 0 && (
+            <Link
+              href={`/${locale}/project/${project!.id}/preview${selectedVersionId ? `?versionId=${selectedVersionId}` : ""}`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
+            >
+              <Film className="h-3.5 w-3.5" />
+              {t("project.preview")}
+            </Link>
           )}
         </div>
       </div>
