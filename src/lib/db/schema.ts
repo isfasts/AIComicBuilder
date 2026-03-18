@@ -31,6 +31,18 @@ export const characters = sqliteTable("characters", {
   referenceImage: text("reference_image"),
 });
 
+export const storyboardVersions = sqliteTable("storyboard_versions", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  versionNum: integer("version_num").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export const shots = sqliteTable("shots", {
   id: text("id").primaryKey(),
   projectId: text("project_id")
@@ -50,6 +62,9 @@ export const shots = sqliteTable("shots", {
   lastFrameUrl: text("last_frame_url"),
   sceneRefFrame: text("scene_ref_frame"),
   videoScript: text("video_script"),
+  versionId: text("version_id").references(() => storyboardVersions.id, {
+    onDelete: "cascade",
+  }),
   status: text("status", {
     enum: ["pending", "generating", "completed", "failed"],
   })
