@@ -139,7 +139,7 @@ export function PresetDialog({ open, onOpenChange, promptKey }: PresetDialogProp
     if (preset.nameKey) {
       // Try to get the translated name using the nameKey
       try {
-        return t(preset.nameKey as Parameters<typeof t>[0]);
+        return t(preset.nameKey.replace(/^promptTemplates\./, "") as Parameters<typeof t>[0]);
       } catch {
         return preset.name;
       }

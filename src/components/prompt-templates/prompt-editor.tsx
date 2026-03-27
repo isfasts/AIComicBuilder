@@ -16,6 +16,11 @@ import { PresetDialog } from "./preset-dialog";
 
 const CATEGORIES = ["all", "script", "character", "shot", "frame", "video"] as const;
 
+/** Strip "promptTemplates." prefix from registry nameKeys since t() is already scoped */
+function tKey(nameKey: string): string {
+  return nameKey.replace(/^promptTemplates\./, "");
+}
+
 export function PromptEditor() {
   const t = useTranslations("promptTemplates");
   const store = usePromptTemplateStore();
@@ -204,7 +209,7 @@ export function PromptEditor() {
                               : "text-[--text-secondary]"
                           }`}
                         >
-                          {t(`prompts.${prompt.nameKey}` as Parameters<typeof t>[0])}
+                          {t(tKey(prompt.nameKey) as Parameters<typeof t>[0])}
                         </span>
                         {isCustomized && (
                           <Badge
@@ -240,7 +245,7 @@ export function PromptEditor() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[--text-primary]">
                     {mode === "slots" && selectedSlot
-                      ? (t(`prompts.${selectedSlot.nameKey}` as Parameters<typeof t>[0]) || selectedSlot.key)
+                      ? (t(tKey(selectedSlot.nameKey) as Parameters<typeof t>[0]) || selectedSlot.key)
                       : t("editor.advancedMode")}
                   </span>
                   {selectedPromptKey && isDirty(selectedPromptKey) && (

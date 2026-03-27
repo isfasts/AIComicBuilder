@@ -5,6 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+function tKey(nameKey: string): string {
+  return nameKey.replace(/^promptTemplates\./, "");
+}
+
 export function SlotList() {
   const t = useTranslations("promptTemplates");
   const {
@@ -49,7 +53,7 @@ export function SlotList() {
                 : "border border-transparent hover:bg-[--surface] text-[--text-secondary]"
             }`}
           >
-            <span className="flex-1 truncate">{t(`prompts.${slot.nameKey}` as Parameters<typeof t>[0]) || slot.key}</span>
+            <span className="flex-1 truncate">{t(tKey(slot.nameKey) as Parameters<typeof t>[0]) || slot.key}</span>
             {modified && (
               <Badge variant="default" className="shrink-0 text-[10px] px-1.5 py-0">
                 {t("editor.modified")}
@@ -68,7 +72,7 @@ export function SlotList() {
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[--text-muted] opacity-60"
             >
               <Lock className="h-3 w-3 shrink-0" />
-              <span className="flex-1 truncate">{t(`prompts.${slot.nameKey}` as Parameters<typeof t>[0]) || slot.key}</span>
+              <span className="flex-1 truncate">{t(tKey(slot.nameKey) as Parameters<typeof t>[0]) || slot.key}</span>
               <span className="shrink-0 text-[10px]">{t("editor.locked")}</span>
             </div>
           ))}
