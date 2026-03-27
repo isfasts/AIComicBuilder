@@ -5,7 +5,6 @@ import { usePromptTemplateStore } from "@/stores/prompt-template-store";
 import { SlotList } from "./slot-list";
 import { PromptPreview } from "./prompt-preview";
 import { AdvancedEditor } from "./advanced-editor";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-fetch";
@@ -21,7 +20,16 @@ function tKey(nameKey: string): string {
   return nameKey.replace(/^promptTemplates\./, "");
 }
 
-export function PromptEditor() {
+interface PromptEditorProps {
+  /** "global" or "project" — determines which API endpoints to use */
+  scope?: "global" | "project";
+  /** Required when scope="project" */
+  projectId?: string;
+  /** Auto-select this prompt on mount */
+  initialPromptKey?: string;
+}
+
+export function PromptEditor({ scope = "global", projectId, initialPromptKey }: PromptEditorProps) {
   const t = useTranslations("promptTemplates");
   const store = usePromptTemplateStore();
   const {
@@ -46,22 +54,30 @@ export function PromptEditor() {
   const [saving, setSaving] = useState(false);
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
 
+  const isProject = scope === "project" && !!projectId;
+
+  // Build the correct API base path based on scope
+  const templatesBasePath = isProject
+    ? `/api/projects/${projectId}/prompt-templates`
+    : "/api/prompt-templates";
+
   // Fetch registry + overrides on mount
   useEffect(() => {
     const init = async () => {
       try {
         const [regResp, overResp] = await Promise.all([
           apiFetch("/api/prompt-templates/registry"),
-          apiFetch("/api/prompt-templates"),
+          apiFetch(templatesBasePath),
         ]);
         const regData = await regResp.json();
         const overData = await overResp.json();
         setRegistry(regData);
         setServerOverrides(overData);
 
-        // Auto-select first prompt
-        if (regData.length > 0 && !selectedPromptKey) {
-          selectPrompt(regData[0].key);
+        // Auto-select prompt
+        const autoKey = initialPromptKey || (regData.length > 0 ? regData[0].key : null);
+        if (autoKey && !selectedPromptKey) {
+          selectPrompt(autoKey);
         }
       } catch {
         toast.error("Failed to load prompt templates");
@@ -71,7 +87,7 @@ export function PromptEditor() {
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [scope, projectId]);
 
   // Filter prompts by category
   const filteredPrompts =
@@ -108,13 +124,13 @@ export function PromptEditor() {
       for (const sk of dirtySlots) {
         slots[sk] = getSlotContent(selectedPromptKey, sk);
       }
-      await apiFetch(`/api/prompt-templates/${selectedPromptKey}`, {
+      await apiFetch(`${templatesBasePath}/${selectedPromptKey}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "slots", slots }),
       });
       // Refresh overrides
-      const resp = await apiFetch("/api/prompt-templates");
+      const resp = await apiFetch(templatesBasePath);
       const data = await resp.json();
       setServerOverrides(data);
       clearEdits(selectedPromptKey);
@@ -129,10 +145,10 @@ export function PromptEditor() {
   const handleReset = async () => {
     if (!selectedPromptKey) return;
     try {
-      await apiFetch(`/api/prompt-templates/${selectedPromptKey}`, {
+      await apiFetch(`${templatesBasePath}/${selectedPromptKey}`, {
         method: "DELETE",
       });
-      const resp = await apiFetch("/api/prompt-templates");
+      const resp = await apiFetch(templatesBasePath);
       const data = await resp.json();
       setServerOverrides(data);
       clearEdits(selectedPromptKey);
@@ -152,6 +168,14 @@ export function PromptEditor() {
 
   return (
     <div className="flex h-full flex-col gap-4">
+      {/* Scope indicator for project mode */}
+      {isProject && (
+        <div className="flex items-center gap-2 rounded-xl bg-primary/5 px-3 py-2 text-xs text-primary">
+          <Badge variant="default" className="text-[10px]">{t("project.useProjectPrompts")}</Badge>
+          <span className="text-[--text-secondary]">{t("project.useProjectPromptsDesc")}</span>
+        </div>
+      )}
+
       {/* Category filter pills */}
       <div className="flex flex-wrap gap-1.5 rounded-2xl border border-[--border-subtle] bg-white p-2">
         {CATEGORIES.map((cat) => (
@@ -320,7 +344,7 @@ export function PromptEditor() {
 
               {/* Editor body — fills remaining height, no page scroll */}
               {mode === "advanced" ? (
-                <AdvancedEditor />
+                <AdvancedEditor scope={scope} projectId={projectId} />
               ) : selectedSlot ? (
                 <div className="flex flex-1 flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto p-3">

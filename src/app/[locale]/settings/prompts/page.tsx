@@ -3,12 +3,19 @@
 import { PromptEditor } from "@/components/prompt-templates/prompt-editor";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export default function PromptSettingsPage() {
   const t = useTranslations("promptTemplates");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const scope = (searchParams.get("scope") as "global" | "project") || "global";
+  const projectId = searchParams.get("projectId") || undefined;
+  const initialPromptKey = searchParams.get("prompt") || undefined;
+  const isProject = scope === "project" && !!projectId;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -25,13 +32,19 @@ export default function PromptSettingsPage() {
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-3.5 w-3.5" />
             </div>
-            <div>
+            <div className="flex items-center gap-2">
               <span className="font-display text-sm font-semibold text-[--text-primary]">
                 {t("title")}
               </span>
-              <span className="ml-2 text-xs text-[--text-muted]">
-                {t("subtitle")}
-              </span>
+              {isProject ? (
+                <Badge variant="default" className="text-[10px]">
+                  {t("project.useProjectPrompts")}
+                </Badge>
+              ) : (
+                <span className="text-xs text-[--text-muted]">
+                  {t("subtitle")}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -40,7 +53,11 @@ export default function PromptSettingsPage() {
 
       <main className="flex flex-1 flex-col overflow-hidden bg-[--surface] p-4 lg:p-6">
         <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden animate-page-in">
-          <PromptEditor />
+          <PromptEditor
+            scope={scope}
+            projectId={projectId}
+            initialPromptKey={initialPromptKey}
+          />
         </div>
       </main>
     </div>

@@ -10,7 +10,16 @@ import { toast } from "sonner";
 import { Save, RotateCcw } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-export function AdvancedEditor() {
+interface AdvancedEditorProps {
+  scope?: "global" | "project";
+  projectId?: string;
+}
+
+export function AdvancedEditor({ scope = "global", projectId }: AdvancedEditorProps) {
+  const isProject = scope === "project" && !!projectId;
+  const templatesBasePath = isProject
+    ? `/api/projects/${projectId}/prompt-templates`
+    : "/api/prompt-templates";
   const t = useTranslations("promptTemplates");
   const {
     selectedPromptKey,
@@ -88,7 +97,7 @@ export function AdvancedEditor() {
 
   const doSave = async () => {
     try {
-      await apiFetch(`/api/prompt-templates/${selectedPromptKey}`, {
+      await apiFetch(`${templatesBasePath}/${selectedPromptKey}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,7 +107,7 @@ export function AdvancedEditor() {
       });
 
       // Refresh overrides
-      const resp = await apiFetch("/api/prompt-templates");
+      const resp = await apiFetch(templatesBasePath);
       const data = await resp.json();
       setServerOverrides(data);
       clearEdits(selectedPromptKey);
@@ -113,11 +122,11 @@ export function AdvancedEditor() {
 
   const handleReset = async () => {
     try {
-      await apiFetch(`/api/prompt-templates/${selectedPromptKey}`, {
+      await apiFetch(`${templatesBasePath}/${selectedPromptKey}`, {
         method: "DELETE",
       });
       // Refresh
-      const resp = await apiFetch("/api/prompt-templates");
+      const resp = await apiFetch(templatesBasePath);
       const data = await resp.json();
       setServerOverrides(data);
       clearEdits(selectedPromptKey);
