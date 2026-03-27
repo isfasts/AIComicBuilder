@@ -14,7 +14,8 @@
     "language": "Language",
     "switchLanguage": "Switch Language",
     "generationFailed": "Generation failed. Please check your model configuration and try again.",
-    "batchPartialFailed": "Some items failed to generate. Please try again."
+    "batchPartialFailed": "Some items failed to generate. Please try again.",
+    "promptTemplates": "Prompt Templates"
   },
   "dashboard": {
     "title": "My Projects",

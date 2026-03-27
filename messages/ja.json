@@ -14,7 +14,8 @@
     "language": "言語",
     "switchLanguage": "言語を切替",
     "generationFailed": "生成に失敗しました。モデル設定を確認して再試行してください。",
-    "batchPartialFailed": "一部のアイテムの生成に失敗しました。後でもう一度お試しください。"
+    "batchPartialFailed": "一部のアイテムの生成に失敗しました。後でもう一度お試しください。",
+    "promptTemplates": "プロンプト管理"
   },
   "dashboard": {
     "title": "マイプロジェクト",

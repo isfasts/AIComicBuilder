@@ -14,7 +14,8 @@
     "language": "语言",
     "switchLanguage": "切换语言",
     "generationFailed": "生成失败，请检查模型配置后重试",
-    "batchPartialFailed": "部分项目生成失败，请稍后重试"
+    "batchPartialFailed": "部分项目生成失败，请稍后重试",
+    "promptTemplates": "提示词管理"
   },
   "dashboard": {
     "title": "我的项目",
