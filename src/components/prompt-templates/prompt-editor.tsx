@@ -151,7 +151,7 @@ export function PromptEditor() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col gap-4">
       {/* Category filter pills */}
       <div className="flex flex-wrap gap-1.5 rounded-2xl border border-[--border-subtle] bg-white p-2">
         {CATEGORIES.map((cat) => (
@@ -178,8 +178,8 @@ export function PromptEditor() {
         />
       )}
 
-      {/* Three-column editor */}
-      <div className="flex min-h-[600px] overflow-hidden rounded-2xl border border-[--border-subtle] bg-white">
+      {/* Three-column editor — fill remaining viewport height */}
+      <div className="flex flex-1 overflow-hidden rounded-2xl border border-[--border-subtle] bg-white">
         {/* Left column: Prompt list */}
         <div className="w-[200px] shrink-0 overflow-y-auto border-r border-[--border-subtle]">
           <div className="flex flex-col gap-0.5 p-2">
@@ -318,13 +318,13 @@ export function PromptEditor() {
                 </div>
               </div>
 
-              {/* Editor body */}
+              {/* Editor body — fills remaining height, no page scroll */}
               {mode === "advanced" ? (
                 <AdvancedEditor />
               ) : selectedSlot ? (
-                <>
-                  <div className="flex-1 p-3">
-                    <Textarea
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto p-3">
+                    <textarea
                       value={currentContent}
                       onChange={(e) => {
                         if (selectedPromptKey && selectedSlotKey) {
@@ -335,14 +335,14 @@ export function PromptEditor() {
                           );
                         }
                       }}
-                      className="min-h-[250px] w-full font-mono text-[12px] leading-relaxed"
+                      className="h-full w-full resize-none rounded-xl border border-[--border-subtle] bg-white px-3.5 py-3 font-mono text-[12px] leading-relaxed text-[--text-primary] outline-none transition-all duration-200 placeholder:text-[--text-muted] hover:border-[--border-hover] focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/15"
                       placeholder={t("editor.edit")}
                     />
                   </div>
-                  <div className="border-t border-[--border-subtle]">
+                  <div className="flex-1 overflow-y-auto border-t border-[--border-subtle]">
                     <PromptPreview />
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-sm text-[--text-muted]">
                   {t("editor.slotMode")}

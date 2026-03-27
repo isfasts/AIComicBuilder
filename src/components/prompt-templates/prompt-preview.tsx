@@ -66,7 +66,7 @@ export function PromptPreview() {
         {t("editor.previewFull")}
       </div>
       <div
-        className={`max-h-[300px] overflow-auto rounded-xl border border-[--border-subtle] p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap ${
+        className={`overflow-auto rounded-xl border border-[--border-subtle] p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap ${
           hasOverrides ? "bg-primary/5" : "text-[--text-muted] bg-[--surface]"
         }`}
       >

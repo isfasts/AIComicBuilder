@@ -11,7 +11,7 @@ export default function PromptSettingsPage() {
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center justify-between border-b border-[--border-subtle] bg-white/80 backdrop-blur-xl px-4 lg:px-6">
         <div className="flex items-center gap-3">
@@ -38,8 +38,8 @@ export default function PromptSettingsPage() {
         <LanguageSwitcher />
       </header>
 
-      <main className="flex-1 bg-[--surface] p-4 lg:p-6">
-        <div className="mx-auto max-w-7xl animate-page-in">
+      <main className="flex flex-1 flex-col overflow-hidden bg-[--surface] p-4 lg:p-6">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden animate-page-in">
           <PromptEditor />
         </div>
       </main>
