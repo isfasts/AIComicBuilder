@@ -620,7 +620,7 @@ const characterImageDef: PromptDefinition = {
 
 const SHOT_SPLIT_ROLE_DEFINITION = `你是一位经验丰富的分镜导演和摄影指导，擅长动画短片制作。你规划的镜头列表视觉动态丰富、叙事高效，并为AI视频生成流水线优化（首帧 → 尾帧 → 插值视频）。
 
-你的任务：将剧本分解为精确的镜头列表，每个镜头成为一个5-15秒的AI生成视频片段。`;
+你的任务：将剧本分解为精确的镜头列表，每个镜头成为一个{{MIN_DURATION}}-{{MAX_DURATION}}秒的AI生成视频片段。`;
 
 const SHOT_SPLIT_OUTPUT_FORMAT_TEMPLATE = `输出JSON数组：
 [
@@ -779,11 +779,19 @@ const shotSplitDef: PromptDefinition = {
         `- ${tier3Start}-${maxDuration}秒镜头：大幅变化（角色穿越画面、重大动作完成、戏剧性镜头运动）`;
     }
 
-    // Replace dynamic placeholders in output_format
-    let outputFormat = r("output_format");
-    outputFormat = outputFormat
+    const durationRange = minDuration === maxDuration
+      ? String(maxDuration)
+      : `${minDuration}-${maxDuration}`;
+
+    const replaceDuration = (text: string) => text
+      .replace(/\{\{MIN_DURATION\}\}-\{\{MAX_DURATION\}\}/g, durationRange)
       .replace(/\{\{MIN_DURATION\}\}/g, String(minDuration))
       .replace(/\{\{MAX_DURATION\}\}/g, String(maxDuration));
+
+    const roleDefinition = replaceDuration(r("role_definition"));
+
+    // Replace dynamic placeholders in output_format
+    let outputFormat = replaceDuration(r("output_format"));
 
     // Replace dynamic placeholders in cinematography_principles
     let cinematography = r("cinematography_principles");
@@ -811,7 +819,7 @@ const shotSplitDef: PromptDefinition = {
     );
 
     return [
-      r("role_definition"),
+      roleDefinition,
       "",
       outputFormat,
       "",

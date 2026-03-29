@@ -15,6 +15,7 @@ import { buildScriptGeneratePrompt } from "@/lib/ai/prompts/script-generate";
 import { buildCharacterExtractPrompt } from "@/lib/ai/prompts/character-extract";
 import { buildShotSplitPrompt } from "@/lib/ai/prompts/shot-split";
 import { resolvePrompt, resolveSlotContents } from "@/lib/ai/prompts/resolver";
+import { getPromptDefinition } from "@/lib/ai/prompts/registry";
 import { getModelMaxDuration } from "@/lib/ai/model-limits";
 import {
   buildFirstFramePrompt,
@@ -148,19 +149,19 @@ export async function POST(
   }
 
   if (action === "batch_frame_generate") {
-    return handleBatchFrameGenerate(projectId, payload, modelConfig, episodeId);
+    return handleBatchFrameGenerate(projectId, userId, payload, modelConfig, episodeId);
   }
 
   if (action === "single_frame_generate") {
-    return handleSingleFrameGenerate(projectId, payload, modelConfig, episodeId);
+    return handleSingleFrameGenerate(projectId, userId, payload, modelConfig, episodeId);
   }
 
   if (action === "single_video_generate") {
-    return handleSingleVideoGenerate(payload, modelConfig);
+    return handleSingleVideoGenerate(projectId, userId, payload, modelConfig);
   }
 
   if (action === "batch_video_generate") {
-    return handleBatchVideoGenerate(projectId, payload, modelConfig, episodeId);
+    return handleBatchVideoGenerate(projectId, userId, payload, modelConfig, episodeId);
   }
 
   if (action === "single_scene_frame") {
@@ -185,6 +186,10 @@ export async function POST(
 
   if (action === "batch_video_prompt") {
     return handleBatchVideoPrompt(projectId, userId, payload, modelConfig, episodeId);
+  }
+
+  if (action === "ai_optimize_text") {
+    return handleAiOptimizeText(payload, modelConfig);
   }
 
   if (action === "video_assemble") {
@@ -605,7 +610,9 @@ async function handleShotSplitStream(
 
   const model = createLanguageModel(modelConfig.text);
   const videoMaxDuration = getModelMaxDuration(modelConfig?.video?.modelId);
-  const systemPrompt = await resolvePrompt("shot_split", { userId, projectId });
+  const shotSplitSlots = await resolveSlotContents("shot_split", { userId, projectId });
+  const shotSplitDef = getPromptDefinition("shot_split")!;
+  const systemPrompt = shotSplitDef.buildFullPrompt(shotSplitSlots, { maxDuration: videoMaxDuration });
   const jsonMode = { openai: { response_format: { type: "json_object" } } };
 
   // Split screenplay into chunks by SCENE markers (~8 scenes per chunk)
@@ -863,6 +870,7 @@ IMPORTANT: Keep the same scene, characters, and narrative intent. Only rephrase 
 
 async function handleBatchFrameGenerate(
   projectId: string,
+  userId: string,
   payload?: Record<string, unknown>,
   modelConfig?: ModelConfig,
   episodeId?: string
@@ -986,6 +994,9 @@ async function handleBatchFrameGenerate(
 
   console.log(`[BatchFrameGenerate] Total: ${allShots.length} shots, need: ${needProcess.length}, skip: ${skipCount}, characters: ${frameCharacters.length}`);
 
+  const frameFirstSlots = await resolveSlotContents("frame_generate_first", { userId, projectId });
+  const frameLastSlots = await resolveSlotContents("frame_generate_last", { userId, projectId });
+
   let previousLastFrame: string | undefined;
 
   for (let i = 0; i < allShots.length; i++) {
@@ -1020,6 +1031,7 @@ async function handleBatchFrameGenerate(
           sceneDescription: shot.prompt || "",
           startFrameDesc: shot.startFrameDesc || shot.prompt || "",
           characterDescriptions,
+          slotContents: frameFirstSlots,
         });
         firstFramePath = await ai.generateImage(firstPrompt, {
           ...imageOpts,
@@ -1038,6 +1050,7 @@ async function handleBatchFrameGenerate(
         endFrameDesc: shot.endFrameDesc || shot.prompt || "",
         characterDescriptions,
         firstFramePath,
+        slotContents: frameLastSlots,
       });
       const lastFramePath = await ai.generateImage(lastPrompt, {
         ...imageOpts,
@@ -1095,6 +1108,7 @@ async function handleBatchFrameGenerate(
 
 async function handleSingleFrameGenerate(
   projectId: string,
+  userId: string,
   payload?: Record<string, unknown>,
   modelConfig?: ModelConfig,
   episodeId?: string
@@ -1171,6 +1185,9 @@ async function handleSingleFrameGenerate(
   const ai = resolveImageProvider(modelConfig, versionedUploadDir);
   const imageOpts = ratioToImageOpts(payload?.ratio as string | undefined);
 
+  const frameFirstSlots = await resolveSlotContents("frame_generate_first", { userId, projectId });
+  const frameLastSlots = await resolveSlotContents("frame_generate_last", { userId, projectId });
+
   try {
     await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
 
@@ -1183,6 +1200,7 @@ async function handleSingleFrameGenerate(
         sceneDescription: shot.prompt || "",
         startFrameDesc: shot.startFrameDesc || shot.prompt || "",
         characterDescriptions,
+        slotContents: frameFirstSlots,
       });
       firstFramePath = await ai.generateImage(firstPrompt, {
         ...imageOpts,
@@ -1196,6 +1214,7 @@ async function handleSingleFrameGenerate(
       endFrameDesc: shot.endFrameDesc || shot.prompt || "",
       characterDescriptions,
       firstFramePath,
+      slotContents: frameLastSlots,
     });
     const lastFramePath = await ai.generateImage(lastPrompt, {
       ...imageOpts,
@@ -1227,6 +1246,8 @@ async function handleSingleFrameGenerate(
 // --- single_video_generate: synchronous video generation for one shot ---
 
 async function handleSingleVideoGenerate(
+  projectId: string,
+  userId: string,
   payload?: Record<string, unknown>,
   modelConfig?: ModelConfig
 ) {
@@ -1263,6 +1284,7 @@ async function handleSingleVideoGenerate(
     .orderBy(asc(dialogues.sequence));
 
   const videoProvider = resolveVideoProvider(modelConfig, versionedUploadDir);
+  const videoSlots = await resolveSlotContents("video_generate", { userId, projectId });
 
   try {
     await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
@@ -1278,7 +1300,7 @@ async function handleSingleVideoGenerate(
     const onScreenDialogueChars = shotDialogues
       .map((d) => shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
       .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
-    
+
     const dialogueList = shotDialogues.map((d) => {
       const char = shotCharacters.find((c) => c.id === d.characterId);
       const characterName = char?.name ?? "Unknown";
@@ -1299,6 +1321,7 @@ async function handleSingleVideoGenerate(
       duration: effectiveDuration,
       characters: shotCharacters,
       dialogues: dialogueList.length > 0 ? dialogueList : undefined,
+      slotContents: videoSlots,
     });
 
     const result = await videoProvider.generateVideo({
@@ -1326,6 +1349,7 @@ async function handleSingleVideoGenerate(
 
 async function handleBatchVideoGenerate(
   projectId: string,
+  userId: string,
   payload?: Record<string, unknown>,
   modelConfig?: ModelConfig,
   episodeId?: string
@@ -1364,6 +1388,7 @@ async function handleBatchVideoGenerate(
   const videoProvider = resolveVideoProvider(modelConfig, versionedUploadDir);
   const ratio = (payload?.ratio as string) || "16:9";
   const videoMaxDuration = getModelMaxDuration(modelConfig?.video?.modelId);
+  const videoSlots = await resolveSlotContents("video_generate", { userId, projectId });
 
   // Mark all as generating
   await Promise.all(
@@ -1387,7 +1412,7 @@ async function handleBatchVideoGenerate(
         const onScreenDialogueChars = shotDialogues
           .map((d) => batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
           .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
-        
+
         const dialogueList = shotDialogues.map((d) => {
           const char = batchCharacters.find((c) => c.id === d.characterId);
           const characterName = char?.name ?? "Unknown";
@@ -1409,6 +1434,7 @@ async function handleBatchVideoGenerate(
           duration: effectiveDuration,
           characters: batchCharacters,
           dialogues: dialogueList.length > 0 ? dialogueList : undefined,
+          slotContents: videoSlots,
         });
 
         const result = await videoProvider.generateVideo({
@@ -1699,6 +1725,7 @@ async function handleSingleReferenceVideo(
   });
 
   const ratio = (payload?.ratio as string) || "16:9";
+  const refVideoSlots = await resolveSlotContents("ref_video_generate", { userId, projectId });
 
   try {
     await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
@@ -1765,6 +1792,7 @@ async function handleSingleReferenceVideo(
           duration: effectiveDuration,
           characters: projectCharacters,
           dialogues: dialogueList.length > 0 ? dialogueList : undefined,
+          slotContents: refVideoSlots,
         });
       }
     }
@@ -1863,6 +1891,7 @@ async function handleBatchReferenceVideo(
   const refVideoSystem = await resolvePrompt("ref_video_prompt", { userId, projectId });
   const ratio = (payload?.ratio as string) || "16:9";
   const videoMaxDuration = getModelMaxDuration(modelConfig?.video?.modelId);
+  const refVideoSlots = await resolveSlotContents("ref_video_generate", { userId, projectId });
 
   await Promise.all(
     eligible.map((shot) =>
@@ -1883,7 +1912,7 @@ async function handleBatchReferenceVideo(
         const onScreenDialogueChars = shotDialogues
           .map((d) => projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
           .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
-        
+
         const dialogueList = shotDialogues.map((d) => {
           const char = projectCharacters.find((c) => c.id === d.characterId);
           const characterName = char?.name ?? "Unknown";
@@ -1947,6 +1976,7 @@ async function handleBatchReferenceVideo(
               duration: effectiveDuration,
               characters: projectCharacters,
               dialogues: dialogueList.length > 0 ? dialogueList : undefined,
+              slotContents: refVideoSlots,
             });
           }
         }
@@ -2274,4 +2304,41 @@ async function handleBatchVideoPrompt(
   const errCount = results.filter((r) => r.status === "error").length;
   console.log(`[BatchVideoPrompt] Done: ${okCount} ok, ${errCount} errors, total ${((Date.now() - bvpStartTime) / 1000).toFixed(1)}s`);
   return NextResponse.json({ results, status: "ok" });
+}
+
+// --- ai_optimize_text: use AI to optimize a text field ---
+
+async function handleAiOptimizeText(
+  payload?: Record<string, unknown>,
+  modelConfig?: ModelConfig
+) {
+  const originalText = payload?.originalText as string;
+  const instruction = payload?.instruction as string;
+
+  if (!originalText || !instruction) {
+    return NextResponse.json({ error: "Missing originalText or instruction" }, { status: 400 });
+  }
+  if (!modelConfig?.text) {
+    return NextResponse.json({ error: "No text model configured" }, { status: 400 });
+  }
+
+  const model = createLanguageModel(modelConfig.text);
+  const { text } = await generateText({
+    model,
+    system: `你是一位专业的AI动画内容优化专家。用户会给你一段原始文本和优化指令，请根据指令优化原始文本。
+规则：
+- 只输出优化后的文本，不要添加任何解释、前言或标记
+- 保持原文的语言（中文输入→中文输出）
+- 保持原文的整体结构和用途
+- 根据优化指令做针对性改进`,
+    prompt: `原始文本：
+${originalText}
+
+优化指令：
+${instruction}
+
+请输出优化后的文本：`,
+  });
+
+  return NextResponse.json({ optimizedText: text.trim() });
 }

@@ -8,6 +8,8 @@ import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
 import { Save, RotateCcw, Wand2, Lock, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useModelStore } from "@/stores/model-store";
+import { getModelMaxDuration } from "@/lib/ai/model-limits";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -64,6 +66,23 @@ export function PromptDrawer({ open, onOpenChange, promptKeys: rawKeys, projectI
   const [serverOverrides, setServerOverrides] = useState<Record<string, Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const defaultVideoModel = useModelStore((s) => s.defaultVideoModel);
+  const videoMaxDuration = getModelMaxDuration(defaultVideoModel?.modelId);
+  const videoMinDuration = Math.min(8, videoMaxDuration);
+
+  function resolvePlaceholders(content: string): string {
+    const durationRange = videoMinDuration === videoMaxDuration
+      ? String(videoMaxDuration)
+      : `${videoMinDuration}-${videoMaxDuration}`;
+    return content
+      .replace(/\{\{MIN_DURATION\}\}-\{\{MAX_DURATION\}\}/g, durationRange)
+      .replace(/\{\{MIN_DURATION\}\}/g, String(videoMinDuration))
+      .replace(/\{\{MAX_DURATION\}\}/g, String(videoMaxDuration))
+      .replace(/\{\{DIALOGUE_MAX\}\}/g, String(Math.min(videoMaxDuration, 12)))
+      .replace(/\{\{ACTION_MAX\}\}/g, String(Math.min(videoMaxDuration, 12)))
+      .replace(/\{\{ESTABLISHING_MAX\}\}/g, String(Math.min(videoMaxDuration, 10)));
+  }
 
   const isProject = !!projectId;
   const templatesBasePath = isProject
@@ -368,7 +387,7 @@ export function PromptDrawer({ open, onOpenChange, promptKeys: rawKeys, projectI
                     )}
                   </div>
                   <textarea
-                    value={slotContents[selectedSlot.promptKey]?.[selectedSlot.slotKey] ?? ""}
+                    value={resolvePlaceholders(slotContents[selectedSlot.promptKey]?.[selectedSlot.slotKey] ?? "")}
                     readOnly={!currentSlotMeta.editable}
                     onChange={(e) => {
                       if (!currentSlotMeta.editable) return;

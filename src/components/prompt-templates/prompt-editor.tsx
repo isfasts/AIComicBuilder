@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { Save, RotateCcw, Layers } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { PresetDialog } from "./preset-dialog";
+import { useModelStore } from "@/stores/model-store";
+import { getModelMaxDuration } from "@/lib/ai/model-limits";
 
 const CATEGORIES = ["all", "script", "character", "storyboard"] as const;
 
@@ -126,10 +128,29 @@ export function PromptEditor({ scope = "global", projectId, initialPromptKey }: 
   const selectedSlot = selectedPrompt?.slots.find(
     (s) => s.key === selectedSlotKey
   );
-  const currentContent =
+  const defaultVideoModel = useModelStore((s) => s.defaultVideoModel);
+  const videoMaxDuration = getModelMaxDuration(defaultVideoModel?.modelId);
+  const videoMinDuration = Math.min(8, videoMaxDuration);
+
+  /** Replace known {{...}} placeholders with real values for display */
+  function resolvePlaceholders(content: string): string {
+    const durationRange = videoMinDuration === videoMaxDuration
+      ? String(videoMaxDuration)
+      : `${videoMinDuration}-${videoMaxDuration}`;
+    return content
+      .replace(/\{\{MIN_DURATION\}\}-\{\{MAX_DURATION\}\}/g, durationRange)
+      .replace(/\{\{MIN_DURATION\}\}/g, String(videoMinDuration))
+      .replace(/\{\{MAX_DURATION\}\}/g, String(videoMaxDuration))
+      .replace(/\{\{DIALOGUE_MAX\}\}/g, String(Math.min(videoMaxDuration, 12)))
+      .replace(/\{\{ACTION_MAX\}\}/g, String(Math.min(videoMaxDuration, 12)))
+      .replace(/\{\{ESTABLISHING_MAX\}\}/g, String(Math.min(videoMaxDuration, 10)));
+  }
+
+  const rawContent =
     selectedPromptKey && selectedSlotKey
       ? getSlotContent(selectedPromptKey, selectedSlotKey)
       : "";
+  const currentContent = resolvePlaceholders(rawContent);
 
   const handleSave = async () => {
     if (!selectedPromptKey) return;
